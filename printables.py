@@ -5,13 +5,40 @@ from urllib.parse import quote_plus
 BASE_URL = "https://www.printables.com"
 
 
+def extract_image(img):
+    if not img:
+        return None
+
+    image = img.get("src") or img.get("data-src")
+
+    if not image:
+        srcset = img.get("srcset")
+        if srcset:
+            image = srcset.split(",")[0].split(" ")[0]
+
+    if not image:
+        return None
+
+    if image.startswith("data:image"):
+        return None
+
+    if image.startswith("//"):
+        image = "https:" + image
+
+    if image.startswith("/"):
+        image = BASE_URL + image
+
+    return image
+
+
 def search(query: str):
+
     q = quote_plus(query.strip())
     url = f"{BASE_URL}/search/models?q={q}"
 
     headers = {
         "User-Agent": "Mozilla/5.0",
-        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Language": "en-US,en;q=0.9"
     }
 
     try:
@@ -44,21 +71,8 @@ def search(query: str):
             slug = full_url.split("/")[-1]
             title = slug.replace("-", " ")
 
-        image = None
         img = a.select_one("img")
-
-        if img:
-            image = img.get("src") or img.get("data-src")
-
-            # ignorar base64 gigantes
-            if image and image.startswith("data:image"):
-                image = None
-
-            if image and image.startswith("//"):
-                image = "https:" + image
-
-            if image and image.startswith("/"):
-                image = BASE_URL + image
+        image = extract_image(img)
 
         results.append({
             "title": title,
