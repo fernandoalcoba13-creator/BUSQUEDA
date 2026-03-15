@@ -1,34 +1,19 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
+import re
 
 BASE_URL = "https://www.printables.com"
 
 
-def extract_image(img):
-    if not img:
+def get_preview_image(model_url):
+    match = re.search(r'/model/(\d+)', model_url)
+    if not match:
         return None
 
-    image = img.get("src") or img.get("data-src")
+    model_id = match.group(1)
 
-    if not image:
-        srcset = img.get("srcset")
-        if srcset:
-            image = srcset.split(",")[0].split(" ")[0]
-
-    if not image:
-        return None
-
-    if image.startswith("data:image"):
-        return None
-
-    if image.startswith("//"):
-        image = "https:" + image
-
-    if image.startswith("/"):
-        image = BASE_URL + image
-
-    return image
+    return f"https://media.printables.com/media/prints/{model_id}/images/{model_id}_640x480.jpg"
 
 
 def search(query: str):
@@ -63,6 +48,7 @@ def search(query: str):
 
         if full_url in seen:
             continue
+
         seen.add(full_url)
 
         title = a.get_text(strip=True)
@@ -71,8 +57,7 @@ def search(query: str):
             slug = full_url.split("/")[-1]
             title = slug.replace("-", " ")
 
-        img = a.select_one("img")
-        image = extract_image(img)
+        image = get_preview_image(full_url)
 
         results.append({
             "title": title,
