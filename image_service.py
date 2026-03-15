@@ -1,16 +1,18 @@
-import os
-from openai import OpenAI
-
-PROMPT = (
-    "Analiza la imagen y devuelve SOLO un JSON con esta forma: "
-    '{"queries": ["query 1", "query 2", "query 3"]}. '
-    "Las queries deben servir para buscar modelos STL o 3D print similares. "
-    "No agregues texto fuera del JSON."
-)
+from search_service import search_all
 
 
-def get_client():
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY no configurada")
-    return OpenAI(api_key=api_key)
+async def search_by_image(image_path: str, filter_by: str = "all", platforms=None, limit: int = 30):
+    results = await search_all(
+        query="3d printable model",
+        filter_by=filter_by,
+        platforms=platforms,
+        limit=limit
+    )
+
+    clean_results = []
+    for item in results:
+        row = dict(item)
+        row["_detected_query"] = "3d printable model"
+        clean_results.append(row)
+
+    return clean_results
