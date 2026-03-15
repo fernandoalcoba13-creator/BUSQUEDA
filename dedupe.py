@@ -1,17 +1,23 @@
-from utils.normalize import normalize_title_for_dedupe
+from normalize import normalize_title_for_dedupe
 
 
-def dedupe_results(results: list[dict]) -> list[dict]:
+def dedupe_results(results):
     seen = set()
-    clean = []
-    for r in results:
+    deduped = []
+
+    for item in results:
+        title = item.get("title", "")
+        url = item.get("url", "")
+
         key = (
-            normalize_title_for_dedupe(r.get("title", "")),
-            r.get("platform", ""),
-            r.get("url", ""),
+            normalize_title_for_dedupe(title),
+            url.strip().lower()
         )
+
         if key in seen:
             continue
+
         seen.add(key)
-        clean.append(r)
-    return clean
+        deduped.append(item)
+
+    return deduped
