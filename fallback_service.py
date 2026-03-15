@@ -1,32 +1,29 @@
-from utils.normalize import build_query_variants
-
-PLATFORMS = {
-    "thingiverse": "thingiverse.com",
-    "printables": "printables.com",
-    "myminifactory": "myminifactory.com",
-    "makerworld": "makerworld.com",
-    "cults3d": "cults3d.com",
-}
+from normalize import build_query_variants
 
 
-async def search_fallback(query: str, selected_platforms: list[str]) -> list[dict]:
-    # Fallback simple y seguro: generar links de búsqueda directa por dominio.
-    # No depende de scraping. Muestra al usuario dónde seguir buscando.
+def fallback_search(query: str):
+    variants = build_query_variants(query)
+
+    sites = [
+        ("thingiverse", "https://www.thingiverse.com/search?q={}"),
+        ("printables", "https://www.printables.com/search/models?q={}"),
+        ("myminifactory", "https://www.myminifactory.com/search/?query={}"),
+        ("makerworld", "https://makerworld.com/en/search/models?keyword={}"),
+        ("cults3d", "https://cults3d.com/en/search?q={}"),
+    ]
+
     results = []
-    for variant in build_query_variants(query)[:2]:
-        for platform in selected_platforms:
-            domain = PLATFORMS.get(platform)
-            if not domain:
-                continue
-            results.append(
-                {
-                    "title": f"Buscar '{variant}' en {platform}",
-                    "url": f"https://www.google.com/search?q=site:{domain}+{variant.replace(' ', '+')}",
-                    "image": "",
-                    "platform": platform,
-                    "price": "unknown",
-                    "score": 10,
-                    "source": "fallback",
-                }
-            )
+
+    for variant in variants[:3]:
+        q = variant.replace(" ", "+")
+
+        for platform, url_template in sites:
+            results.append({
+                "title": f"{variant} ({platform})",
+                "url": url_template.format(q),
+                "platform": platform,
+                "image": None,
+                "price": "unknown",
+            })
+
     return results
