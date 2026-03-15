@@ -5,3 +5,4 @@ python-multipart==0.0.9
 openai==1.51.0
 beautifulsoup4==4.12.3
 aiosqlite==0.20.0
+requests==2.32.3
