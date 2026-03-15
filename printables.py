@@ -30,7 +30,6 @@ def search(query: str):
     results = []
     seen = set()
 
-    # Buscar links directos a modelos
     for a in soup.select('a[href*="/model/"]'):
         href = a.get("href")
         if not href or "/model/" not in href:
@@ -42,7 +41,6 @@ def search(query: str):
             continue
         seen.add(full_url)
 
-        # Intentar sacar título
         title = (
             a.get("title")
             or a.get_text(" ", strip=True)
@@ -50,15 +48,17 @@ def search(query: str):
         ).strip()
 
         if not title or len(title) < 3:
-            # fallback: usar último segmento de la URL
             slug = full_url.rstrip("/").split("/")[-1]
             title = slug.replace("-", " ").strip()
 
-        # Intentar imagen cercana
         image = None
         img = a.select_one("img")
         if img:
             image = img.get("src") or img.get("data-src")
+            if image and image.startswith("//"):
+                image = "https:" + image
+            elif image and image.startswith("/"):
+                image = f"{BASE_URL}{image}"
 
         results.append({
             "title": title,
@@ -68,10 +68,9 @@ def search(query: str):
             "price": "free",
         })
 
-        if len(results) >= 24:
+        if len(results) >= 12:
             break
 
-    # Filtrado extra por relevancia básica
     q_words = set(query.lower().split())
     filtered = []
     for item in results:
@@ -79,4 +78,11 @@ def search(query: str):
         if any(w in title_lower for w in q_words):
             filtered.append(item)
 
-    return filtered if filtered else results
+    final_results = filtered if filtered else results
+    final_results = sorted(
+        final_results,
+        key=lambda x: query.lower() in x["title"].lower(),
+        reverse=True
+    )
+
+    return final_results
