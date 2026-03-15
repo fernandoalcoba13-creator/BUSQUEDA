@@ -1,44 +1,35 @@
-import json
 import time
-import aiosqlite
 
-DB_PATH = "cache.db"
-CACHE_TTL_SECONDS = 60 * 60 * 6
-
-
-async def init_cache() -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS search_cache (
-                cache_key TEXT PRIMARY KEY,
-                payload TEXT NOT NULL,
-                created_at INTEGER NOT NULL
-            )
-            """
-        )
-        await db.commit()
+# caché en memoria simple
+_CACHE = {}
+_DEFAULT_TTL = 60 * 60  # 1 hora
 
 
-async def get_cache(cache_key: str):
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT payload, created_at FROM search_cache WHERE cache_key = ?",
-            (cache_key,),
-        ) as cursor:
-            row = await cursor.fetchone()
-            if not row:
-                return None
-            payload, created_at = row
-            if int(time.time()) - created_at > CACHE_TTL_SECONDS:
-                return None
-            return json.loads(payload)
+def get_cached_results(query: str):
+    if not query:
+        return None
+
+    item = _CACHE.get(query)
+    if not item:
+        return None
+
+    expires_at = item.get("expires_at", 0)
+    if time.time() > expires_at:
+        _CACHE.pop(query, None)
+        return None
+
+    return item.get("results")
 
 
-async def set_cache(cache_key: str, payload: dict):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "REPLACE INTO search_cache (cache_key, payload, created_at) VALUES (?, ?, ?)",
-            (cache_key, json.dumps(payload), int(time.time())),
-        )
-        await db.commit()
+def set_cached_results(query: str, results, ttl: int = _DEFAULT_TTL):
+    if not query:
+        return
+
+    _CACHE[query] = {
+        "results": results,
+        "expires_at": time.time() + ttl
+    }
+
+
+def clear_cache():
+    _CACHE.clear()
