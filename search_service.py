@@ -1,63 +1,70 @@
 import asyncio
-from providers import thingiverse, printables, myminifactory, makerworld, cults3d
-from services.fallback_service import search_fallback
-from services.ranking_service import rank_results
-from utils.dedupe import dedupe_results
-from utils.normalize import build_query_variants, normalize_text
 
-PROVIDER_MAP = {
-    "thingiverse": thingiverse.search,
-    "printables": printables.search,
-    "myminifactory": myminifactory.search,
-    "makerworld": makerworld.search,
-    "cults3d": cults3d.search,
-}
+import thingiverse
+import printables
+import myminifactory
+import makerworld
+import cults3d
+
+from ranking_service import rank_results
+from fallback_service import fallback_search
+from dedupe import dedupe_results
+from normalize import normalize_query
+from cache import get_cached_results, set_cached_results
 
 
-async def _safe_provider_call(provider_name: str, query: str) -> list[dict]:
+async def _run_provider(provider_module, query: str):
     try:
-        results = await PROVIDER_MAP[provider_name](query)
-        for r in results:
-            r.setdefault("platform", provider_name)
-            r.setdefault("price", "unknown")
-            r.setdefault("image", "")
-            r.setdefault("source", "provider")
-        return results
-    except Exception as exc:
-        print(f"[provider-error] {provider_name}: {exc}")
+        if hasattr(provider_module, "search"):
+            result = provider_module.search(query)
+            if asyncio.iscoroutine(result):
+                result = await result
+            return result or []
+        return []
+    except Exception as e:
+        print(f"[WARN] Provider failed: {provider_module.__name__}: {e}")
         return []
 
 
-async def search_all(query: str, selected_platforms: list[str], price_filter: str = "all") -> dict:
-    query = normalize_text(query)
-    variants = build_query_variants(query)
-    results = []
-    platform_stats = {name: 0 for name in selected_platforms}
+async def search_all(query: str, filter_by: str = "all", platforms=None, limit: int = 30):
+    normalized_query = normalize_query(query)
 
-    for variant in variants[:2]:
-        tasks = [_safe_provider_call(name, variant) for name in selected_platforms if name in PROVIDER_MAP]
-        provider_groups = await asyncio.gather(*tasks)
-        for provider_name, group in zip(selected_platforms, provider_groups):
-            if price_filter != "all":
-                group = [g for g in group if g.get("price") == price_filter]
-            platform_stats[provider_name] += len(group)
-            results.extend(group)
-        if results:
-            break
+    cached = get_cached_results(normalized_query)
+    if cached:
+        return cached[:limit]
+
+    provider_map = {
+        "thingiverse": thingiverse,
+        "printables": printables,
+        "myminifactory": myminifactory,
+        "makerworld": makerworld,
+        "cults3d": cults3d,
+    }
+
+    if platforms:
+        selected = [p for p in platforms if p in provider_map]
+    else:
+        selected = list(provider_map.keys())
+
+    tasks = [_run_provider(provider_map[name], normalized_query) for name in selected]
+    provider_results = await asyncio.gather(*tasks)
+
+    results = []
+    for batch in provider_results:
+        if batch:
+            results.extend(batch)
 
     if not results:
-        fallback_results = await search_fallback(query, selected_platforms)
-        results.extend(fallback_results)
-        for item in fallback_results:
-            platform_stats[item["platform"]] += 1
+        results = fallback_search(normalized_query)
 
     results = dedupe_results(results)
-    results = rank_results(results, query)
+    results = rank_results(results, normalized_query)
 
-    return {
-        "query": query,
-        "filter": price_filter,
-        "total": len(results),
-        "platform_stats": platform_stats,
-        "results": results[:30],
-    }
+    results = results[:limit]
+
+    try:
+        set_cached_results(normalized_query, results)
+    except Exception as e:
+        print(f"[WARN] Cache save failed: {e}")
+
+    return results
