@@ -1,8 +1,7 @@
 import time
 
-# caché en memoria simple
 _CACHE = {}
-_DEFAULT_TTL = 60 * 60  # 1 hora
+_DEFAULT_TTL = 3600
 
 
 def get_cached_results(query: str):
@@ -13,12 +12,11 @@ def get_cached_results(query: str):
     if not item:
         return None
 
-    expires_at = item.get("expires_at", 0)
-    if time.time() > expires_at:
+    if time.time() > item["expires_at"]:
         _CACHE.pop(query, None)
         return None
 
-    return item.get("results")
+    return item["results"]
 
 
 def set_cached_results(query: str, results, ttl: int = _DEFAULT_TTL):
@@ -27,7 +25,7 @@ def set_cached_results(query: str, results, ttl: int = _DEFAULT_TTL):
 
     _CACHE[query] = {
         "results": results,
-        "expires_at": time.time() + ttl
+        "expires_at": time.time() + ttl,
     }
 
 
