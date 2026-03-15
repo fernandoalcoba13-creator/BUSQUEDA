@@ -1,2 +1,0 @@
-# BUSQUEDA
-landing
