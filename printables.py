@@ -10,27 +10,31 @@ HEADERS = {
 }
 
 
-def extract_real_image(model_url: str):
+def extract_real_image(model_url):
     try:
         r = requests.get(model_url, headers=HEADERS, timeout=15)
         r.raise_for_status()
-    except Exception as e:
-        print("printables model page error:", e)
+    except:
         return None
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # SOLO estas dos: imagen real del modelo
+    # OG IMAGE
     og = soup.find("meta", property="og:image")
     if og and og.get("content"):
         return og["content"]
 
+    # TWITTER IMAGE
     tw = soup.find("meta", attrs={"name": "twitter:image"})
     if tw and tw.get("content"):
         return tw["content"]
 
-    return None
+    # fallback real del visor
+    img = soup.select_one("img[src*='media.printables.com']")
+    if img:
+        return img.get("src")
 
+    return None
 
 def search(query: str):
     q = quote_plus(query.strip())
