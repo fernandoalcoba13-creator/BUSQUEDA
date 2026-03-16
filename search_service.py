@@ -1,69 +1,42 @@
-import asyncio
-
-import printables
-import thingiverse
-import cults3d
-import makerworld
-import myminifactory
-
-from ranking_service import rank_results
-from fallback_service import fallback_search
-from dedupe import dedupe_results
-from normalize import normalize_query
-from cache import get_cached_results, set_cached_results
+from platforms import printables
+from platforms import thingiverse
+from platforms import cults3d
+from platforms import myminifactory
+from platforms import makerworld
 
 
-async def _run_provider(provider_module, query: str):
-    try:
-        if hasattr(provider_module, "search"):
-            result = provider_module.search(query)
-            if asyncio.iscoroutine(result):
-                result = await result
-            return result or []
-        return []
-    except Exception as e:
-        print(f"[WARN] Provider failed: {provider_module.__name__}: {e}")
-        return []
-
-
-async def search_all(query: str, filter_by: str = "all", platforms=None, limit: int = 30):
-    normalized_query = normalize_query(query)
-
-    cached = get_cached_results(normalized_query)
-    if cached:
-        return cached[:limit]
-
-    provider_map = {
-        "thingiverse": thingiverse,
-        "printables": printables,
-        "myminifactory": myminifactory,
-        "makerworld": makerworld,
-        "cults3d": cults3d,
-    }
-
-    if platforms:
-        selected = [p for p in platforms if p in provider_map]
-    else:
-        selected = list(provider_map.keys())
-
-    tasks = [_run_provider(provider_map[name], normalized_query) for name in selected]
-    provider_results = await asyncio.gather(*tasks)
+def search(query, platforms):
 
     results = []
-    for batch in provider_results:
-        if batch:
-            results.extend(batch)
 
-    if not results:
-        results = fallback_search(normalized_query)
+    if "printables" in platforms:
+        try:
+            results += printables.search(query)
+        except Exception as e:
+            print("printables error", e)
 
-    results = dedupe_results(results)
-    results = rank_results(results, normalized_query)
-    results = results[:limit]
+    if "thingiverse" in platforms:
+        try:
+            results += thingiverse.search(query)
+        except Exception as e:
+            print("thingiverse error", e)
 
-    try:
-        set_cached_results(normalized_query, results)
-    except Exception as e:
-        print(f"[WARN] Cache save failed: {e}")
+    if "cults3d" in platforms:
+        try:
+            results += cults3d.search(query)
+        except Exception as e:
+            print("cults error", e)
+
+    if "myminifactory" in platforms:
+        try:
+            results += myminifactory.search(query)
+        except Exception as e:
+            print("mmf error", e)
+
+    if "makerworld" in platforms:
+        try:
+            results += makerworld.search(query)
+        except Exception as e:
+            print("makerworld error", e)
 
     return results
