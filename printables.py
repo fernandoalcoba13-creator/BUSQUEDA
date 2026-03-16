@@ -7,7 +7,6 @@ HEADERS = {
 
 
 def extract_real_image(model_url):
-
     try:
         r = requests.get(model_url, headers=HEADERS, timeout=15)
         r.raise_for_status()
@@ -17,28 +16,18 @@ def extract_real_image(model_url):
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # 1️⃣ Intentar og:image
     og = soup.find("meta", property="og:image")
     if og and og.get("content"):
         return og["content"]
 
-    # 2️⃣ fallback: twitter image
     tw = soup.find("meta", property="twitter:image")
     if tw and tw.get("content"):
         return tw["content"]
 
-    # 3️⃣ fallback: imagen dentro del viewer
-    img = soup.select_one("img")
-    if img and img.get("src"):
-        src = img["src"]
-        if src.startswith("http"):
-            return src
-
     return None
 
 
-def search_printables(query):
-
+def search(query):
     url = f"https://www.printables.com/search/models?q={query}"
 
     try:
@@ -56,24 +45,16 @@ def search_printables(query):
     cards = soup.select("a[href*='/model/']")
 
     for card in cards:
-
         href = card.get("href")
-
-        if not href:
-            continue
-
-        if "/model/" not in href:
+        if not href or "/model/" not in href:
             continue
 
         if href in seen:
             continue
-
         seen.add(href)
 
         title = card.get_text(strip=True)
-
         model_url = "https://www.printables.com" + href
-
         image = extract_real_image(model_url)
 
         results.append({
