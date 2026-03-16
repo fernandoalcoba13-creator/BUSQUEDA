@@ -1,16 +1,12 @@
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import quote_plus
-
-BASE_URL = "https://www.printables.com"
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0",
-    "Accept-Language": "en-US,en;q=0.9"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 }
 
 
-def extract_real_image(model_url: str):
+def extract_real_image(model_url):
     try:
         r = requests.get(model_url, headers=HEADERS, timeout=15)
         r.raise_for_status()
@@ -20,34 +16,16 @@ def extract_real_image(model_url: str):
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # 1) Open Graph image
     og = soup.find("meta", property="og:image")
+
     if og and og.get("content"):
         return og["content"]
-
-    # 2) Twitter image
-    tw = soup.find("meta", attrs={"name": "twitter:image"})
-    if tw and tw.get("content"):
-        return tw["content"]
-
-    # 3) fallback img
-    img = soup.find("img")
-    if img:
-        src = img.get("src") or img.get("data-src")
-        if src:
-            if src.startswith("//"):
-                return "https:" + src
-            if src.startswith("/"):
-                return BASE_URL + src
-            if src.startswith("http"):
-                return src
 
     return None
 
 
-def search(query: str):
-    q = quote_plus(query.strip())
-    url = f"{BASE_URL}/search/models?q={q}"
+def search_printables(query):
+    url = f"https://www.printables.com/search/models?q={query}"
 
     try:
         r = requests.get(url, headers=HEADERS, timeout=15)
@@ -57,33 +35,39 @@ def search(query: str):
         return []
 
     soup = BeautifulSoup(r.text, "html.parser")
+
     results = []
+
+    cards = soup.select("a[href*='/model/']")
+
     seen = set()
 
-    for a in soup.select('a[href*="/model/"]'):
-        href = a.get("href")
+    for card in cards:
+
+        href = card.get("href")
+
         if not href:
             continue
 
-        full_url = href if href.startswith("http") else BASE_URL + href
-
-        if full_url in seen:
+        if "/model/" not in href:
             continue
-        seen.add(full_url)
 
-        title = a.get_text(strip=True)
-        if not title:
-            slug = full_url.split("/")[-1]
-            title = slug.replace("-", " ")
+        if href in seen:
+            continue
 
-        image = extract_real_image(full_url)
+        seen.add(href)
+
+        title = card.get_text(strip=True)
+
+        model_url = "https://www.printables.com" + href
+
+        image = extract_real_image(model_url)
 
         results.append({
             "title": title,
-            "url": full_url,
-            "platform": "printables",
+            "url": model_url,
             "image": image,
-            "price": "free"
+            "platform": "printables"
         })
 
         if len(results) >= 12:
