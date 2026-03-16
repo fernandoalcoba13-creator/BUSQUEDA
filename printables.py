@@ -18,18 +18,21 @@ def extract_real_image(model_url):
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # 1️⃣ OG IMAGE
+    # 1 OG IMAGE (la correcta casi siempre)
     og = soup.find("meta", property="og:image")
     if og and og.get("content"):
-        if "media.printables.com" in og["content"]:
-            return og["content"]
+        img = og["content"]
+        if "printables" in img:
+            return img
 
-    # 2️⃣ buscar imagen del modelo
-    imgs = soup.select("img")
-    for img in imgs:
+    # 2 buscar imagen del modelo
+    for img in soup.find_all("img"):
         src = img.get("src", "")
         if "media.printables.com/media/prints" in src:
             return src
+
+    # 3 fallback placeholder
+    return "https://kmorra.com/assets/img/no-preview.png"
 
     # 3️⃣ fallback usando ID del modelo
     try:
