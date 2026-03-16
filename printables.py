@@ -9,7 +9,6 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9"
 }
 
-
 def extract_real_image(model_url):
     try:
         r = requests.get(model_url, headers=HEADERS, timeout=15)
@@ -19,21 +18,25 @@ def extract_real_image(model_url):
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # OG IMAGE
+    # 1️⃣ OG IMAGE
     og = soup.find("meta", property="og:image")
     if og and og.get("content"):
-        if "media.printables.com/media/prints" in og["content"]:
+        if "media.printables.com" in og["content"]:
             return og["content"]
 
-    # Buscar imagen del modelo
+    # 2️⃣ buscar imagen del modelo
     imgs = soup.select("img")
-
     for img in imgs:
         src = img.get("src", "")
         if "media.printables.com/media/prints" in src:
             return src
 
-    return None
+    # 3️⃣ fallback usando ID del modelo
+    try:
+        model_id = model_url.split("/model/")[1].split("-")[0]
+        return f"https://media.printables.com/media/prints/{model_id}/images/1_preview.jpg"
+    except:
+        return None
 def search(query: str):
     q = quote_plus(query.strip())
     url = f"{BASE_URL}/search/models?q={q}"
