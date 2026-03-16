@@ -1,57 +1,47 @@
 import requests
-from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
 
-BASE_URL = "https://www.printables.com"
+API_URL = "https://api.printables.com/v1/search/?q={}&type=prints"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
-    "Accept-Language": "en-US,en;q=0.9"
+    "Accept": "application/json"
 }
 
 
 def search(query: str):
+
     q = quote_plus(query.strip())
-    url = f"{BASE_URL}/search/models?q={q}"
+    url = API_URL.format(q)
 
     try:
         r = requests.get(url, headers=HEADERS, timeout=15)
         r.raise_for_status()
     except Exception as e:
-        print("printables search error:", e)
+        print("printables api error:", e)
         return []
 
-    soup = BeautifulSoup(r.text, "html.parser")
+    data = r.json()
 
     results = []
-    seen = set()
 
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
+    for item in data.get("prints", [])[:12]:
 
-        if "/model/" not in href:
-            continue
+        title = item.get("name")
+        model_id = item.get("id")
 
-        full_url = href if href.startswith("http") else BASE_URL + href
+        image = None
+        images = item.get("images")
 
-        if full_url in seen:
-            continue
-        seen.add(full_url)
-
-        title = a.get_text(strip=True)
-        if not title:
-            slug = full_url.rstrip("/").split("/")[-1]
-            title = slug.replace("-", " ").strip()
+        if images:
+            image = images[0].get("url")
 
         results.append({
             "title": title,
-            "url": full_url,
+            "url": f"https://www.printables.com/model/{model_id}",
             "platform": "printables",
-            "image": "https://via.placeholder.com/400x300?text=Printables",
+            "image": image,
             "price": "free"
         })
-
-        if len(results) >= 12:
-            break
 
     return results
