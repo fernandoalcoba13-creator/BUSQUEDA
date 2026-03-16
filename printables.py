@@ -22,20 +22,18 @@ def extract_real_image(model_url):
     # OG IMAGE
     og = soup.find("meta", property="og:image")
     if og and og.get("content"):
-        return og["content"]
+        if "media.printables.com/media/prints" in og["content"]:
+            return og["content"]
 
-    # TWITTER IMAGE
-    tw = soup.find("meta", attrs={"name": "twitter:image"})
-    if tw and tw.get("content"):
-        return tw["content"]
+    # Buscar imagen del modelo
+    imgs = soup.select("img")
 
-    # fallback real del visor
-    img = soup.select_one("img[src*='media.printables.com']")
-    if img:
-        return img.get("src")
+    for img in imgs:
+        src = img.get("src", "")
+        if "media.printables.com/media/prints" in src:
+            return src
 
     return None
-
 def search(query: str):
     q = quote_plus(query.strip())
     url = f"{BASE_URL}/search/models?q={q}"
