@@ -1,25 +1,77 @@
 import requests
+from bs4 import BeautifulSoup
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
+
+
+def extract_real_image(model_url):
+    try:
+        r = requests.get(model_url, headers=HEADERS, timeout=15)
+        r.raise_for_status()
+    except Exception as e:
+        print("printables model page error:", e)
+        return None
+
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    og = soup.find("meta", property="og:image")
+    if og and og.get("content"):
+        return og["content"]
+
+    tw = soup.find("meta", property="twitter:image")
+    if tw and tw.get("content"):
+        return tw["content"]
+
+    return None
+
 
 def search(query):
-
-    url = f"https://api.printables.com/search/models?q={query}"
+    url = f"https://www.printables.com/search/models?q={query}"
 
     try:
-        r = requests.get(url, timeout=15)
-        data = r.json()
-    except:
+        r = requests.get(url, headers=HEADERS, timeout=15)
+        r.raise_for_status()
+    except Exception as e:
+        print("printables search error:", e)
         return []
 
-    results = []
+    soup = BeautifulSoup(r.text, "html.parser")
 
-    for item in data.get("models", [])[:12]:
+    results = []
+    seen = set()
+
+    links = soup.find_all("a", href=True)
+
+    for link in links:
+        href = link["href"]
+
+        if "/model/" not in href:
+            continue
+
+        if href in seen:
+            continue
+
+        seen.add(href)
+
+        title = link.get_text(strip=True)
+
+        if not title:
+            continue
+
+        model_url = "https://www.printables.com" + href
+        image = extract_real_image(model_url)
 
         results.append({
-            "title": item.get("name"),
-            "url": f"https://www.printables.com/model/{item.get('id')}",
-            "image": item.get("preview_image"),
+            "title": title,
+            "url": model_url,
+            "image": image,
             "platform": "printables",
             "price": "free"
         })
+
+        if len(results) >= 12:
+            break
 
     return results
