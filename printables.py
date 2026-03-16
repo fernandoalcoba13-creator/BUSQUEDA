@@ -28,6 +28,7 @@ def extract_real_image(model_url):
 
 
 def search(query):
+
     url = f"https://www.printables.com/search/models?q={query}"
 
     try:
@@ -42,19 +43,27 @@ def search(query):
     results = []
     seen = set()
 
-    cards = soup.select("a[href*='/model/']")
+    links = soup.find_all("a", href=True)
 
-    for card in cards:
-        href = card.get("href")
-        if not href or "/model/" not in href:
+    for link in links:
+
+        href = link["href"]
+
+        if "/model/" not in href:
             continue
 
         if href in seen:
             continue
+
         seen.add(href)
 
-        title = card.get_text(strip=True)
+        title = link.get_text(strip=True)
+
+        if not title:
+            continue
+
         model_url = "https://www.printables.com" + href
+
         image = extract_real_image(model_url)
 
         results.append({
