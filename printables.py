@@ -2,11 +2,12 @@ import requests
 from bs4 import BeautifulSoup
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    "User-Agent": "Mozilla/5.0"
 }
 
 
 def extract_real_image(model_url):
+
     try:
         r = requests.get(model_url, headers=HEADERS, timeout=15)
         r.raise_for_status()
@@ -16,15 +17,28 @@ def extract_real_image(model_url):
 
     soup = BeautifulSoup(r.text, "html.parser")
 
+    # 1️⃣ Intentar og:image
     og = soup.find("meta", property="og:image")
-
     if og and og.get("content"):
         return og["content"]
+
+    # 2️⃣ fallback: twitter image
+    tw = soup.find("meta", property="twitter:image")
+    if tw and tw.get("content"):
+        return tw["content"]
+
+    # 3️⃣ fallback: imagen dentro del viewer
+    img = soup.select_one("img")
+    if img and img.get("src"):
+        src = img["src"]
+        if src.startswith("http"):
+            return src
 
     return None
 
 
 def search_printables(query):
+
     url = f"https://www.printables.com/search/models?q={query}"
 
     try:
@@ -37,10 +51,9 @@ def search_printables(query):
     soup = BeautifulSoup(r.text, "html.parser")
 
     results = []
+    seen = set()
 
     cards = soup.select("a[href*='/model/']")
-
-    seen = set()
 
     for card in cards:
 
@@ -67,7 +80,8 @@ def search_printables(query):
             "title": title,
             "url": model_url,
             "image": image,
-            "platform": "printables"
+            "platform": "printables",
+            "price": "free"
         })
 
         if len(results) >= 12:
