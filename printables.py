@@ -14,38 +14,46 @@ def extract_real_image(model_url):
     try:
         r = requests.get(model_url, headers=HEADERS, timeout=15)
         r.raise_for_status()
-    except Exception:
-        return "https://kmorra.com/assets/img/no-preview.png"
+    except:
+        return "https://via.placeholder.com/400x300?text=No+Preview"
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # 1) OG IMAGE
+    # 1 OG image (la mejor)
     og = soup.find("meta", property="og:image")
     if og and og.get("content"):
-        img = og["content"]
-        if "media.printables.com" in img:
-            return img
+        return og["content"]
 
-    # 2) Twitter image
+    # 2 Twitter image
     tw = soup.find("meta", attrs={"name": "twitter:image"})
     if tw and tw.get("content"):
-        img = tw["content"]
-        if "media.printables.com" in img:
-            return img
+        return tw["content"]
 
-    # 3) Buscar imagen real del modelo en el HTML
-    for img_tag in soup.find_all("img"):
-        src = img_tag.get("src", "")
+    # 3 Buscar en imgs
+    for img in soup.find_all("img"):
+        src = img.get("src", "")
         if "media.printables.com/media/prints" in src:
             return src
 
-    # 4) Fallback usando ID del modelo
+    # 4 Fallback generando previews posibles
     try:
         model_id = model_url.split("/model/")[1].split("-")[0]
-        return f"https://media.printables.com/media/prints/{model_id}/images/1_preview.jpg"
-    except Exception:
-        return "https://kmorra.com/assets/img/no-preview.png"
 
+        candidates = [
+            f"https://media.printables.com/media/prints/{model_id}/images/preview.jpg",
+            f"https://media.printables.com/media/prints/{model_id}/images/preview_1.jpg",
+            f"https://media.printables.com/media/prints/{model_id}/images/1_preview.jpg",
+        ]
+
+        for url in candidates:
+            test = requests.head(url, timeout=5)
+            if test.status_code == 200:
+                return url
+
+    except:
+        pass
+
+    return "https://via.placeholder.com/400x300?text=No+Preview"
 
 def search(query: str):
     q = quote_plus(query.strip())
