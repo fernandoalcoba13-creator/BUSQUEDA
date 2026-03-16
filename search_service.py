@@ -54,8 +54,8 @@ async def search_all(query: str, filter_by: str = "all", platforms=None, limit: 
         if batch:
             results.extend(batch)
 
-    if not results:
-        results = fallback_search(normalized_query)
+    # if not results:
+#     results = fallback_search(normalized_query)
 
     results = dedupe_results(results)
     results = rank_results(results, normalized_query)
