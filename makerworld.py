@@ -1,53 +1,20 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
-import re
 
 BASE_URL = "https://makerworld.com"
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://makerworld.com/",
+    "User-Agent": "Mozilla/5.0",
+    "Accept-Language": "en-US,en;q=0.9"
 }
 
 PLACEHOLDER = "https://via.placeholder.com/400x300?text=MakerWorld"
 
 
-def normalize_url(url: str) -> str:
-    if not url:
-        return None
-    url = url.strip()
-    if url.startswith("//"):
-        return "https:" + url
-    if url.startswith("/"):
-        return BASE_URL + url
-    return url
-
-
-def extract_image(tag) -> str:
-    if not tag:
-        return PLACEHOLDER
-    img = tag.find("img")
-    if img:
-        for attr in ["src", "data-src", "data-lazy-src", "data-original"]:
-            val = normalize_url(img.get(attr))
-            if val and val.startswith("http") and not "placeholder" in val:
-                return val
-        srcset = img.get("srcset", "")
-        if srcset:
-            parts = [p.strip() for p in srcset.split(",") if p.strip()]
-            for part in parts:
-                url = normalize_url(part.split(" ")[0])
-                if url and url.startswith("http"):
-                    return url
-    return PLACEHOLDER
-
-
 def search(query: str):
     q = quote_plus(query.strip())
-    url = f"{BASE_URL}/en/search?keyword={q}"
+    url = f"{BASE_URL}/en/search/models?keyword={q}"
 
     try:
         r = requests.get(url, headers=HEADERS, timeout=15)
@@ -57,34 +24,49 @@ def search(query: str):
         return []
 
     soup = BeautifulSoup(r.text, "html.parser")
+
     results = []
     seen = set()
 
-    # Buscar links a modelos
-    for a in soup.find_all("a", href=re.compile(r"/en/models/\d+")):
-        href = a.get("href", "")
+    # 🔥 buscar links reales de modelos
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+
+        if "/en/models/" not in href:
+            continue
+
         full_url = href if href.startswith("http") else BASE_URL + href
 
         if full_url in seen:
             continue
         seen.add(full_url)
 
+        # título
         title = a.get_text(strip=True)
         if not title:
-            title = full_url.rstrip("/").split("/")[-1].replace("-", " ").strip()
+            title = full_url.rstrip("/").split("/")[-1].replace("-", " ")
 
-        image = extract_image(a) or extract_image(a.find_parent())
+        # imagen
+        img_tag = a.find("img")
+        image = None
+
+        if img_tag:
+            image = img_tag.get("src") or img_tag.get("data-src")
+
+        if not image:
+            image = PLACEHOLDER
 
         results.append({
             "title": title,
             "url": full_url,
             "platform": "makerworld",
             "image": image,
-            "price": "free",
+            "price": "free"
         })
 
         if len(results) >= 12:
             break
 
-    print(f"[makerworld] '{query}' → {len(results)} resultados")
+    print(f"[makerworld] '{query}' -> {len(results)} resultados")
+
     return results
