@@ -6,10 +6,45 @@ BASE_URL = "https://makerworld.com"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
-    "Accept-Language": "en-US,en;q=0.9"
+    "Accept-Language": "en-US,en;q=0.9",
 }
 
 PLACEHOLDER = "https://via.placeholder.com/400x300?text=MakerWorld"
+
+
+def normalize_url(url: str):
+    if not url:
+        return None
+    url = url.strip()
+    if url.startswith("//"):
+        return "https:" + url
+    if url.startswith("/"):
+        return BASE_URL + url
+    return url
+
+
+def extract_image(tag):
+    if not tag:
+        return PLACEHOLDER
+
+    img = tag.find("img")
+    if not img:
+        return PLACEHOLDER
+
+    for attr in ["src", "data-src", "data-lazy-src", "data-original"]:
+        val = normalize_url(img.get(attr))
+        if val and val.startswith("http") and "placeholder" not in val:
+            return val
+
+    srcset = img.get("srcset", "")
+    if srcset:
+        parts = [p.strip() for p in srcset.split(",") if p.strip()]
+        for part in parts:
+            url = normalize_url(part.split(" ")[0])
+            if url and url.startswith("http"):
+                return url
+
+    return PLACEHOLDER
 
 
 def search(query: str):
@@ -21,21 +56,15 @@ def search(query: str):
         print(f"[makerworld] status={r.status_code} url={url}")
         r.raise_for_status()
     except Exception as e:
-        print(f"[makerworld] request error: {e}")
+        print(f"[makerworld] error: {e}")
         return []
 
-    html = r.text
-    print(f"[makerworld] html preview: {html[:500]}")
-
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(r.text, "html.parser")
 
     results = []
     seen = set()
 
-    links = soup.find_all("a", href=True)
-    print(f"[makerworld] total <a> encontrados: {len(links)}")
-
-    for a in links:
+    for a in soup.find_all("a", href=True):
         href = a["href"]
 
         if "/en/models/" not in href:
@@ -51,20 +80,18 @@ def search(query: str):
         if not title:
             title = full_url.rstrip("/").split("/")[-1].replace("-", " ")
 
-        img_tag = a.find("img")
-        image = None
-        if img_tag:
-            image = img_tag.get("src") or img_tag.get("data-src")
-
-        if not image:
-            image = PLACEHOLDER
+        image = extract_image(a)
+        if image == PLACEHOLDER:
+            parent = a.find_parent()
+            if parent:
+                image = extract_image(parent)
 
         results.append({
             "title": title,
             "url": full_url,
             "platform": "makerworld",
             "image": image,
-            "price": "free"
+            "price": "free",
         })
 
         if len(results) >= 12:
