@@ -18,18 +18,24 @@ def search(query: str):
 
     try:
         r = requests.get(url, headers=HEADERS, timeout=15)
+        print(f"[makerworld] status={r.status_code} url={url}")
         r.raise_for_status()
     except Exception as e:
-        print(f"[makerworld] error: {e}")
+        print(f"[makerworld] request error: {e}")
         return []
 
-    soup = BeautifulSoup(r.text, "html.parser")
+    html = r.text
+    print(f"[makerworld] html preview: {html[:500]}")
+
+    soup = BeautifulSoup(html, "html.parser")
 
     results = []
     seen = set()
 
-    # 🔥 buscar links reales de modelos
-    for a in soup.find_all("a", href=True):
+    links = soup.find_all("a", href=True)
+    print(f"[makerworld] total <a> encontrados: {len(links)}")
+
+    for a in links:
         href = a["href"]
 
         if "/en/models/" not in href:
@@ -41,15 +47,12 @@ def search(query: str):
             continue
         seen.add(full_url)
 
-        # título
         title = a.get_text(strip=True)
         if not title:
             title = full_url.rstrip("/").split("/")[-1].replace("-", " ")
 
-        # imagen
         img_tag = a.find("img")
         image = None
-
         if img_tag:
             image = img_tag.get("src") or img_tag.get("data-src")
 
@@ -68,5 +71,4 @@ def search(query: str):
             break
 
     print(f"[makerworld] '{query}' -> {len(results)} resultados")
-
     return results
