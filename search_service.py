@@ -7,7 +7,6 @@ import myminifactory
 import makerworld
 
 from ranking_service import rank_results
-from fallback_service import fallback_search
 from dedupe import dedupe_results
 from normalize import normalize_query
 from cache import get_cached_results, set_cached_results
@@ -19,8 +18,15 @@ async def _run_provider(provider_module, query: str):
             result = provider_module.search(query)
             if asyncio.iscoroutine(result):
                 result = await result
+
+            count = len(result or [])
+            print(f"[PROVIDER] {provider_module.__name__} -> {count} resultados para '{query}'")
+
             return result or []
+
+        print(f"[PROVIDER] {provider_module.__name__} -> no tiene función search")
         return []
+
     except Exception as e:
         print(f"[WARN] Provider failed: {provider_module.__name__}: {e}")
         return []
@@ -31,6 +37,7 @@ async def search_all(query: str, filter_by: str = "all", platforms=None, limit: 
 
     cached = get_cached_results(normalized_query)
     if cached:
+        print(f"[CACHE] hit para '{normalized_query}' -> {len(cached)} resultados")
         return cached[:limit]
 
     provider_map = {
@@ -46,6 +53,8 @@ async def search_all(query: str, filter_by: str = "all", platforms=None, limit: 
     else:
         selected = list(provider_map.keys())
 
+    print(f"[SEARCH] query='{normalized_query}' platforms={selected}")
+
     tasks = [_run_provider(provider_map[name], normalized_query) for name in selected]
     provider_results = await asyncio.gather(*tasks)
 
@@ -54,10 +63,11 @@ async def search_all(query: str, filter_by: str = "all", platforms=None, limit: 
         if batch:
             results.extend(batch)
 
-    # if not results:
-#     results = fallback_search(normalized_query)
+    print(f"[SEARCH] total bruto -> {len(results)} resultados")
 
     results = dedupe_results(results)
+    print(f"[SEARCH] después de dedupe -> {len(results)} resultados")
+
     results = rank_results(results, normalized_query)
     results = results[:limit]
 
