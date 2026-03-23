@@ -1,10 +1,7 @@
 import asyncio
 
 import printables
-import thingiverse
 import cults3d
-import myminifactory
-import makerworld
 
 from ranking_service import rank_results
 from dedupe import dedupe_results
@@ -21,7 +18,6 @@ async def _run_provider(provider_module, query: str):
 
             count = len(result or [])
             print(f"[PROVIDER] {provider_module.__name__} -> {count} resultados para '{query}'")
-
             return result or []
 
         print(f"[PROVIDER] {provider_module.__name__} -> no tiene función search")
@@ -41,10 +37,7 @@ async def search_all(query: str, filter_by: str = "all", platforms=None, limit: 
         return cached[:limit]
 
     provider_map = {
-        "thingiverse": thingiverse,
         "printables": printables,
-        "myminifactory": myminifactory,
-        "makerworld": makerworld,
         "cults3d": cults3d,
     }
 
